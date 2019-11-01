@@ -1,0 +1,38 @@
+version: 2.1
+commands:
+  restore_composer_deps:
+    description: Restores composer dependencies from cache
+    steps:
+      - restore_cache:
+          keys:
+            - php-vendor-{{ checksum "composer.lock" }}-{{ .Branch }}
+            - php-vendor-{{ checksum "composer.lock" }}
+
+jobs:
+  composer:
+    docker:
+      - image: playsportsgroup/php:7.2-cli-alpine-root
+    steps:
+      - checkout
+      - restore_composer_deps
+      - run: composer install --prefer-dist
+      - save_cache:
+          key: php-composer-{{ checksum "composer.lock" }}-{{ .Branch }}
+          paths:
+            - vendor
+  baler:
+    docker:
+      - image: ashsmith/magento-baler-ci:alpha
+    steps:
+      - checkout
+      - restore_composer_deps
+      - run: bin/magento setup:static-content:deploy --area=frontend en_US
+      - run: baler build --theme Magento/luma
+workflows:
+  version: 2
+  build:
+    jobs:
+      - composer
+      - baler:
+          requires:
+            - composer
